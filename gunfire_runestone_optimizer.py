@@ -1,15 +1,26 @@
 # Gunfire Reborn Rune Stone Optimizer
 
+import time
+
 # name, points (x, y, value)
 # x represents column, y represents row.
 PIECE_MAP = {
-    "A": [(1, 0, 2), (0, 1, 1)],
-    "B": [(1, 0, 1), (0, 1, 2)],
+    "A": [(2, 0, 4), (0, 2, 4)],
+    "B": [(-2, 2, 4)],
+    "C": [(2, 2, 3)],
+    "D": [(-1, 1, 4)],
+    "E": [(1, -1, 2), (-2, 0, 2), (-1, 0, 3), (-1, 1, 2), (0, 1, 2), (0, 2, 4)],
+    "F": [(0, -2, 2), (2, -2, 1)],
+    "G": [(0, -2, 2), (0, -1, 4), (1, 0, 2)],
+    "H": [(0, -1, 3), (-1, 0, 1)],
 }
 
-PIECES = ["A", "B"]
+PIECES = [key for key in PIECE_MAP]
 
-BADGES = [4, 2]
+BADGES = sorted([10, 10, 8, 8, 8, 6, 6, 6], reverse=True)
+MAX_POINTS = sum(BADGES)
+THRESHOLD = min(54, MAX_POINTS)
+MAX_LOST_POINTS = 1
 
 POINT_MOD = 2
 
@@ -55,6 +66,8 @@ class Graph:
   def __init__(self, badges: list[int] | None = None):
     self.graph = [[0 for _ in range(COLS)] for _ in range(ROWS)]
     self.badges = sorted(badges, reverse=True) if badges else []
+    self.score = -1
+    self.lost_points = 0
 
   def is_valid(self, x: int, y: int):
     return x >= 0 and x < COLS and y >= 0 and y < ROWS
@@ -64,18 +77,34 @@ class Graph:
 
   def insert(self, x: int, y: int, num_rotations: int, piece: Piece):
     """Inserts value into self.m."""
+    self.score = -1
+
     if not self.is_empty(x, y):
       print("Error: overlap")
-      return
+      return False
 
+    if self.graph[y][x] > 0:
+      self.lost_points += self.graph[y][x]
+      if self.lost_points > MAX_LOST_POINTS:
+        return False
     self.graph[y][x] = piece.name + str(num_rotations)
+
     points = piece.get_points(x, y, num_rotations)
     for p in points:
       if self.is_valid(p.x, p.y) and self.is_empty(p.x, p.y):
         self.graph[p.y][p.x] += p.value
+      else:
+        self.lost_points += p.value
+        if self.lost_points > MAX_LOST_POINTS:
+          return False
+
+    return True
 
   def get_score(self):
     """Returns the score of the graph."""
+    if self.score >= 0:
+      return self.score
+
     points = []
     for row in self.graph:
       for val in row:
@@ -133,22 +162,29 @@ def recurse(graph: Graph, remaining_pieces: list[Piece]):
       # Try all rotations.
       for num_rotations in range(4):
         new_graph = graph.copy()
-        new_graph.insert(x, y, num_rotations, piece)
-        result_graphs.append(recurse(new_graph, remaining_pieces[1:]))
+        success = new_graph.insert(x, y, num_rotations, piece)
+        if success:
+          result = recurse(new_graph, remaining_pieces[1:])
+          if result:
+            if result.get_score() >= THRESHOLD:
+              return result
+            result_graphs.append(result)
 
-      # Also try not inserting the piece.
-      result_graphs.append(recurse(graph.copy(), remaining_pieces[1:]))
-
+  if not result_graphs:
+    return None
   return max(result_graphs)
 
 
 if __name__ == "__main__":
+  time_start = time.time()
   print(
       recurse(
-          Graph(sorted(BADGES, reverse=True)),
+          Graph(BADGES),
           [
               Piece(name, [Point(x, y, v) for x, y, v in PIECE_MAP[name]])
               for name in PIECES
           ],
       )
   )
+  time_end = time.time()
+  print("time: ", time_end - time_start)
