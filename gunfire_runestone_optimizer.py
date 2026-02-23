@@ -56,7 +56,7 @@ class Piece:
     self.points = points
 
   def get_points(self, x: int, y: int, num_rotations: int):
-    """Returns the points for the given index."""
+    """Returns the location of points when the piece is placed in the coordinates, with the rotations."""
     return [p.rotate(num_rotations).displace(x, y) for p in self.points]
 
 
@@ -66,38 +66,40 @@ PIECES = [
 ]
 
 
-class Graph:
-  """Graph."""
+class Grid:
+  """Grid."""
 
   def __init__(self):
-    self.graph = [[0 for _ in range(COLS)] for _ in range(ROWS)]
+    self.grid = [[0 for _ in range(COLS)] for _ in range(ROWS)]
     self.score = -1
     self.lost_points = 0
 
   def is_valid(self, x: int, y: int):
+    """Returns true if the coordinate exists in this grid."""
     return x >= 0 and x < COLS and y >= 0 and y < ROWS
 
   def is_empty(self, x: int, y: int):
-    return isinstance(self.graph[y][x], int)
+    """Returns true if the cell in the input coordinate does not have a piece yet."""
+    return isinstance(self.grid[y][x], int)
 
   def insert(self, x: int, y: int, num_rotations: int, piece: Piece):
-    """Inserts value into self.m."""
+    """Inserts a piece into the grid at some specific coordinate and rotation."""
     self.score = -1
 
     if not self.is_empty(x, y):
       print("Error: overlap")
       return False
 
-    if self.graph[y][x] > 0:
-      self.lost_points += self.graph[y][x]
+    if self.grid[y][x] > 0:
+      self.lost_points += self.grid[y][x]
       if self.lost_points > MAX_LOST_POINTS:
         return False
-    self.graph[y][x] = piece.name + str(num_rotations)
+    self.grid[y][x] = piece.name + str(num_rotations)
 
     points = piece.get_points(x, y, num_rotations)
     for p in points:
       if self.is_valid(p.x, p.y) and self.is_empty(p.x, p.y):
-        self.graph[p.y][p.x] += p.value
+        self.grid[p.y][p.x] += p.value
       else:
         self.lost_points += p.value
         if self.lost_points > MAX_LOST_POINTS:
@@ -106,12 +108,12 @@ class Graph:
     return True
 
   def get_score(self):
-    """Returns the score of the graph."""
+    """Returns the score of the grid."""
     if self.score >= 0:
       return self.score
 
     points = []
-    for row in self.graph:
+    for row in self.grid:
       for val in row:
         if isinstance(val, int) and val > 0:
           points.append(val)
@@ -122,15 +124,15 @@ class Graph:
     return score
 
   def copy(self):
-    res = Graph()
-    res.graph = [row[:] for row in self.graph]
+    res = Grid()
+    res.grid = [row[:] for row in self.grid]
     res.score = self.score
     res.lost_points = self.lost_points
     return res
 
   def __repr__(self):
     space = 0
-    for row in self.graph:
+    for row in self.grid:
       for val in row:
         if isinstance(val, str):
           space = max(space, len(val))
@@ -140,7 +142,7 @@ class Graph:
     res = ""
     for y in range(ROWS):
       for x in range(COLS):
-        val = self.graph[y][x]
+        val = self.grid[y][x]
         res += str(val).center(space) + " "
       res += "\n"
     res += "score: " + str(self.get_score())
@@ -153,36 +155,36 @@ class Graph:
     return self.get_score() > other.get_score()
 
 
-def recurse(graph: Graph, piece_index: int):
+def recurse(grid: Grid, piece_index: int):
   """Recurse."""
   if piece_index >= LEN_PIECES:
-    return graph
+    return grid
 
-  result_graphs = []
+  result_grids = []
   piece = PIECES[piece_index]
   for y in range(ROWS):
     for x in range(COLS):
-      if not graph.is_empty(x, y):
+      if not grid.is_empty(x, y):
         continue
 
       # Try all rotations.
       for num_rotations in range(4):
-        new_graph = graph.copy()
-        success = new_graph.insert(x, y, num_rotations, piece)
+        new_grid = grid.copy()
+        success = new_grid.insert(x, y, num_rotations, piece)
         if success:
-          result = recurse(new_graph, piece_index + 1)
+          result = recurse(new_grid, piece_index + 1)
           if result:
             if result.get_score() >= THRESHOLD:
               return result
-            result_graphs.append(result)
+            result_grids.append(result)
 
-  if not result_graphs:
+  if not result_grids:
     return None
-  return max(result_graphs)
+  return max(result_grids)
 
 
 if __name__ == "__main__":
   time_start = time.time()
-  print(recurse(Graph(), 0))
+  print(recurse(Grid(), 0))
   time_end = time.time()
   print("time: ", time_end - time_start)
