@@ -15,9 +15,9 @@ PIECE_MAP = {
     "H": [(0, -1, 3), (-1, 0, 1)],
 }
 
-PIECES = [key for key in PIECE_MAP]
-
 BADGES = sorted([10, 10, 8, 8, 8, 6, 6, 6], reverse=True)
+LEN_BADGES = len(BADGES)
+LEN_PIECES = len(PIECE_MAP)
 MAX_POINTS = sum(BADGES)
 THRESHOLD = min(54, MAX_POINTS)
 MAX_LOST_POINTS = 1
@@ -60,12 +60,17 @@ class Piece:
     return [p.rotate(num_rotations).displace(x, y) for p in self.points]
 
 
+PIECES = [
+    Piece(name, [Point(x, y, v) for x, y, v in PIECE_MAP[name]])
+    for name in PIECE_MAP
+]
+
+
 class Graph:
   """Graph."""
 
-  def __init__(self, badges: list[int] | None = None):
+  def __init__(self):
     self.graph = [[0 for _ in range(COLS)] for _ in range(ROWS)]
-    self.badges = sorted(badges, reverse=True) if badges else []
     self.score = -1
     self.lost_points = 0
 
@@ -112,14 +117,15 @@ class Graph:
           points.append(val)
     sorted_points = sorted(points, reverse=True)
     score = 0
-    for i in range(min(len(self.badges), len(sorted_points))):
-      score += min(sorted_points[i] // POINT_MOD * POINT_MOD, self.badges[i])
+    for i in range(min(LEN_BADGES, len(sorted_points))):
+      score += min(sorted_points[i] // POINT_MOD * POINT_MOD, BADGES[i])
     return score
 
   def copy(self):
     res = Graph()
     res.graph = [row[:] for row in self.graph]
-    res.badges = self.badges[:]
+    res.score = self.score
+    res.lost_points = self.lost_points
     return res
 
   def __repr__(self):
@@ -147,13 +153,13 @@ class Graph:
     return self.get_score() > other.get_score()
 
 
-def recurse(graph: Graph, remaining_pieces: list[Piece]):
+def recurse(graph: Graph, piece_index: int):
   """Recurse."""
-  if not remaining_pieces:
+  if piece_index >= LEN_PIECES:
     return graph
 
   result_graphs = []
-  piece = remaining_pieces[0]
+  piece = PIECES[piece_index]
   for y in range(ROWS):
     for x in range(COLS):
       if not graph.is_empty(x, y):
@@ -164,7 +170,7 @@ def recurse(graph: Graph, remaining_pieces: list[Piece]):
         new_graph = graph.copy()
         success = new_graph.insert(x, y, num_rotations, piece)
         if success:
-          result = recurse(new_graph, remaining_pieces[1:])
+          result = recurse(new_graph, piece_index + 1)
           if result:
             if result.get_score() >= THRESHOLD:
               return result
@@ -177,14 +183,6 @@ def recurse(graph: Graph, remaining_pieces: list[Piece]):
 
 if __name__ == "__main__":
   time_start = time.time()
-  print(
-      recurse(
-          Graph(BADGES),
-          [
-              Piece(name, [Point(x, y, v) for x, y, v in PIECE_MAP[name]])
-              for name in PIECES
-          ],
-      )
-  )
+  print(recurse(Graph(), 0))
   time_end = time.time()
   print("time: ", time_end - time_start)
